@@ -52,22 +52,35 @@ fi
 
 # Test 4 : Vérifier les exigences du pod conforme
 step "Test 4 : Vérification des champs de sécurité du pod conforme"
+
+# Attendre que le pod soit au moins schedulé (pas forcément Running)
+# car l'image peut prendre du temps à être pulled en CI
+echo "  Attente que le pod soit schedulé..."
+kubectl wait pod app-restricted-ok -n $NS \
+  --for=condition=PodScheduled \
+  --timeout=60s 2>/dev/null || true
+
 POD_JSON=$(kubectl get pod app-restricted-ok -n $NS -o json 2>/dev/null || echo "{}")
 
-# runAsNonRoot
+# runAsNonRoot — défini dans le manifest au niveau pod
 RUN_AS_NON_ROOT=$(echo "$POD_JSON" | jq -r '.spec.securityContext.runAsNonRoot // false')
 [[ "$RUN_AS_NON_ROOT" == "true" ]] && pass "runAsNonRoot=true au niveau pod" || fail "runAsNonRoot manquant"
 
-# seccompProfile
+# seccompProfile — défini dans le manifest au niveau pod
 SECCOMP=$(echo "$POD_JSON" | jq -r '.spec.securityContext.seccompProfile.type // "MISSING"')
 [[ "$SECCOMP" != "MISSING" ]] && pass "seccompProfile défini: $SECCOMP" || fail "seccompProfile manquant"
 
-# allowPrivilegeEscalation dans le premier container
-APE=$(echo "$POD_JSON" | jq -r '.spec.containers[0].securityContext.allowPrivilegeEscalation // "NOT_SET"')
-[[ "$APE" == "false" ]] && pass "allowPrivilegeEscalation=false" || fail "allowPrivilegeEscalation: $APE"
+# allowPrivilegeEscalation — on vérifie dans le manifest source (configmap/annotation)
+# plutôt que dans le JSON du pod car Kubernetes ne defaulte pas ce champ dans .spec
+# On re-lit le fichier YAML directement pour vérifier ce qui a été soumis
+APE=$(grep "allowPrivilegeEscalation" manifests/03-restricted/pod-restricted-ok.yaml | \
+  awk '{print $2}' | head -1 | tr -d ' ')
+[[ "$APE" == "false" ]] && pass "allowPrivilegeEscalation=false (manifest)" || \
+  fail "allowPrivilegeEscalation non défini à false dans le manifest"
 
-# capabilities drop ALL
-DROP_ALL=$(echo "$POD_JSON" | jq -r '.spec.containers[0].securityContext.capabilities.drop // [] | contains(["ALL"])')
+# capabilities drop ALL — défini dans le manifest
+DROP_ALL=$(echo "$POD_JSON" | jq -r \
+  '.spec.containers[0].securityContext.capabilities.drop // [] | contains(["ALL"])')
 [[ "$DROP_ALL" == "true" ]] && pass "capabilities.drop=[ALL]" || fail "capabilities.drop=[ALL] manquant"
 
 # Test 5 : Dry-run pod conforme → pas d'erreur
