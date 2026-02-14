@@ -1,0 +1,92 @@
+# manifests/01-privileged/falco-ds.yaml
+# Falco - Runtime Security avec eBPF
+# Nécessite accès privilégié au kernel → namespace privileged obligatoire
+# Documentation: https://falco.org/docs/install-operate/deployment/
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: falco
+  namespace: monitoring-privileged
+  labels:
+    app: falco
+    component: runtime-security
+spec:
+  selector:
+    matchLabels:
+      app: falco
+  template:
+    metadata:
+      labels:
+        app: falco
+    spec:
+      # Falco nécessite accès au kernel hôte
+      hostPID: true      # Pour surveiller les processus hôte
+      hostNetwork: true  # Pour les métriques réseau
+
+      serviceAccountName: falco
+      tolerations:
+        - operator: Exists
+
+      initContainers:
+        - name: falco-driver-loader
+          image: falcosecurity/falco-driver-loader:0.37.0
+          # ⚠️ INTERDIT par baseline et restricted
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: host-modules
+              mountPath: /host/lib/modules
+              readOnly: true
+            - name: boot
+              mountPath: /host/boot
+              readOnly: true
+
+      containers:
+        - name: falco
+          image: falcosecurity/falco-no-driver:0.37.0
+          securityContext:
+            privileged: true   # Requis pour eBPF/kernel modules
+          args:
+            - /usr/bin/falco
+            - --modern-bpf
+            - -pk
+          ports:
+            - name: grpc
+              containerPort: 5060
+            - name: metrics
+              containerPort: 8765
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          volumeMounts:
+            - name: dev
+              mountPath: /host/dev
+            - name: proc
+              mountPath: /host/proc
+              readOnly: true
+            - name: falco-config
+              mountPath: /etc/falco
+
+      volumes:
+        - name: dev
+          hostPath: { path: /dev }
+        - name: proc
+          hostPath: { path: /proc }
+        - name: boot
+          hostPath: { path: /boot }
+        - name: host-modules
+          hostPath: { path: /lib/modules }
+        - name: falco-config
+          configMap:
+            name: falco-config
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: falco
+  namespace: monitoring-privileged

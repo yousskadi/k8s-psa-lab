@@ -1,0 +1,83 @@
+# manifests/03-restricted/pod-restricted-ok.yaml
+# Pod CONFORME au profil RESTRICTED ✅
+# Toutes les exigences du profil restricted sont satisfaites
+# Ce pod est également conforme baseline et privileged par héritage
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app-restricted-ok
+  namespace: app-restricted
+  labels:
+    app: app-secure
+    psa-compliant: restricted
+spec:
+  # ✅ Niveau Pod : SecurityContext global
+  securityContext:
+    # Requis par restricted : aucun container ne doit tourner en root
+    runAsNonRoot: true
+    runAsUser: 65534          # nobody (UID non-root standard)
+    runAsGroup: 65534
+    fsGroup: 65534
+    # Requis par restricted : profil seccomp
+    seccompProfile:
+      type: RuntimeDefault    # Profil par défaut du runtime (runc/containerd)
+      # Alternative: type: Localhost avec un profil JSON custom
+
+  automountServiceAccountToken: false
+
+  containers:
+    - name: app
+      image: nginx:1.25-alpine
+      # ✅ Niveau Container : SecurityContext spécifique
+      securityContext:
+        # Requis par restricted
+        allowPrivilegeEscalation: false   # Interdit l'escalade de privilèges
+        runAsNonRoot: true                 # Redondant si défini au pod, mais explicite
+
+        # Requis par restricted : drop ALL obligatoire
+        capabilities:
+          drop:
+            - ALL                          # Retire TOUTES les capabilities Linux
+          # add:                           # N'ajouter que si ABSOLUMENT nécessaire
+          #   - NET_BIND_SERVICE           # Seule capability autorisée par restricted
+
+        # Bonne pratique (non requis par restricted mais recommandé)
+        readOnlyRootFilesystem: true       # Empêche l'écriture dans le FS du container
+
+        # Seccomp au niveau container (override du niveau pod si nécessaire)
+        seccompProfile:
+          type: RuntimeDefault
+
+      ports:
+        - containerPort: 8080
+
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "50m"
+        limits:
+          memory: "128Mi"
+          cpu: "100m"
+
+      # Volumes temporaires pour les besoins applicatifs
+      # (readOnlyRootFilesystem nécessite ces montages pour écrire)
+      volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: var-cache-nginx
+          mountPath: /var/cache/nginx
+        - name: var-run
+          mountPath: /var/run
+
+  volumes:
+    # ✅ emptyDir autorisé par restricted (contrairement à hostPath)
+    - name: tmp
+      emptyDir: {}
+    - name: var-cache-nginx
+      emptyDir: {}
+    - name: var-run
+      emptyDir: {}
+
+  # ✅ Pas de hostNetwork, hostPID, hostIPC
+  # (absents = false par défaut)

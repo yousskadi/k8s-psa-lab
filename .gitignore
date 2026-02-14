@@ -1,0 +1,42 @@
+# .gitignore
+# Kubernetes
+*.kubeconfig
+kubeconfig
+
+# Kind
+kind-logs/
+
+# Helm
+*.tgz
+charts/
+
+# Tests temporaires
+/tmp/
+*.tmp
+test-results-*.xml
+test-results-*.log
+compliance-report-*.txt
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Secrets (NE JAMAIS committer)
+*.pem
+*.key
+*.crt
+*secret*.yaml
+*-secret.yaml
+secrets/
+vault-token
+
+# Logs
+*.log
+audit.log

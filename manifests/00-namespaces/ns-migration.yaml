@@ -1,0 +1,20 @@
+# manifests/00-namespaces/ns-migration.yaml
+# Namespace en cours de migration PSP→PSA
+# Étape initiale : audit+warn seulement, pas encore d'enforce
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-migration
+  labels:
+    # Phase 1 : Observation pure (warn + audit, PAS d'enforce)
+    # Les pods tournent normalement mais vous voyez les violations
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.28
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.28
+    # NOTE: enforce sera ajouté après correction des workloads
+    team: migration
+    migration-status: "phase-1-observe"
+    migration-target: "restricted"
+    migration-started: "2024-01-15"

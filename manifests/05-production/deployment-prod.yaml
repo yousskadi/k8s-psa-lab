@@ -1,0 +1,111 @@
+# manifests/05-production/deployment-prod.yaml
+# Deployment production pour tenant-a avec toutes les best practices
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenant-a-api
+  namespace: tenant-a-prod
+  labels:
+    app: tenant-a-api
+    version: "1.0"
+    tenant: tenant-a
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: tenant-a-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: tenant-a-api
+    spec:
+      # Conformité restricted complète
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
+      serviceAccountName: tenant-a-api
+      # Anti-affinity pour résilience
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: [tenant-a-api]
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: api
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /var/cache/nginx
+            - name: run
+              mountPath: /var/run
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: { path: /ready, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: tmp
+          emptyDir: { medium: Memory, sizeLimit: 32Mi }
+        - name: cache
+          emptyDir: { sizeLimit: 128Mi }
+        - name: run
+          emptyDir: { sizeLimit: 8Mi }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tenant-a-api
+  namespace: tenant-a-prod
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tenant-a-api
+  namespace: tenant-a-prod
+spec:
+  selector:
+    app: tenant-a-api
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP

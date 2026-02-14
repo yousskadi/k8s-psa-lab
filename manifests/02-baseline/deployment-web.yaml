@@ -1,0 +1,83 @@
+# manifests/02-baseline/deployment-web.yaml
+# Deployment complet conforme au profil baseline
+# Inclut les bonnes pratiques même si non requises par baseline
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  namespace: app-baseline
+  labels:
+    app: web-app
+    version: "1.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+        version: "1.0"
+    spec:
+      # Bonne pratique : ne pas monter le token SA si non nécessaire
+      automountServiceAccountToken: false
+
+      # Pas de hostNetwork/hostPID/hostIPC → conforme baseline ✅
+      securityContext:
+        # runAsNonRoot non obligatoire pour baseline mais recommandé
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 2000
+
+      containers:
+        - name: web-app
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 8080
+          # Note: ce securityContext génèrera des WARNINGS restricted car:
+          # - pas de allowPrivilegeEscalation: false
+          # - pas de capabilities.drop: [ALL]
+          # - pas de seccompProfile
+          # → Normal pour un lab baseline, à corriger pour passer en restricted
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+      # Stratégie de rolling update pour zéro downtime
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app
+  namespace: app-baseline
+spec:
+  selector:
+    app: web-app
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP

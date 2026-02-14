@@ -1,0 +1,18 @@
+# kind/cluster-simple.yaml
+# Cluster Kind minimal pour débuter avec PSA
+# Usage: kind create cluster --name psa-lab --config kind/cluster-simple.yaml
+---
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: psa-lab
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.28.0
+    # Exposition des ports pour accéder aux services depuis l'hôte
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 30080
+        protocol: TCP
+      - containerPort: 30443
+        hostPort: 30443
+        protocol: TCP

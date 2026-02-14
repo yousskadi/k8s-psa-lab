@@ -1,0 +1,27 @@
+# manifests/00-namespaces/ns-privileged.yaml
+# Namespace pour les composants système nécessitant un accès complet
+# Cas d'usage : node-exporter, Falco, agents réseau (CNI), CSI drivers
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring-privileged
+  labels:
+    # Profil privileged : aucune restriction PSA
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: v1.28
+    # Mais on garde warn+audit restricted pour observer les dérives
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.28
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.28
+    # Labels organisationnels (bonne pratique)
+    team: platform
+    environment: all
+    psa-exception: "true"
+  annotations:
+    # OBLIGATOIRE : documenter pourquoi ce namespace est privileged
+    psa-exception-reason: "node-exporter et Falco nécessitent hostPID, hostNetwork et hostPath"
+    psa-exception-reviewer: "security-team"
+    psa-exception-approved-date: "2024-01-15"
+    psa-exception-review-date: "2024-07-15"

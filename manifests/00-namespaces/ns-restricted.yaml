@@ -1,0 +1,36 @@
+# manifests/00-namespaces/ns-restricted.yaml
+# Namespace avec sécurité maximale pour applications critiques
+# Cas d'usage : services de paiement, données personnelles (RGPD), PCI-DSS
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-restricted
+  labels:
+    # enforce=restricted : niveau de sécurité maximum
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.28
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.28
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.28
+    # Labels organisationnels
+    team: payments
+    environment: production
+    compliance: pci-dss
+    data-classification: confidential
+---
+# Namespace séparé pour les tests du profil restricted
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payment-service
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.28
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.28
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.28
+    team: payments
+    environment: production

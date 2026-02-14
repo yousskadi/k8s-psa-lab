@@ -1,0 +1,59 @@
+# helm/psa-namespace/values.yaml
+# Valeurs par défaut du chart psa-namespace
+
+# Nom du namespace à créer
+namespaceName: "my-app"
+
+# Configuration Pod Security Admission
+podSecurity:
+  # Activer les labels PSA (mettre à false pour désactiver complètement)
+  enabled: true
+
+  # Profil d'enforcement : privileged | baseline | restricted
+  # En production, toujours utiliser 'restricted' ou 'baseline'
+  enforce: "baseline"
+
+  # Profil d'audit (log les violations sans bloquer)
+  audit: "restricted"
+
+  # Profil de warning (avertit les utilisateurs sans bloquer)
+  warn: "restricted"
+
+  # Version des PSS à utiliser
+  # IMPORTANT : Fixer une version spécifique en production (ex: v1.28)
+  # 'latest' est pratique en développement mais risqué lors des upgrades K8s
+  version: "v1.28"
+
+# Labels organisationnels (ajoutés au namespace)
+labels: {}
+  # team: backend
+  # environment: production
+  # cost-center: team-backend
+  # compliance: pci-dss
+
+# Annotations (ex: pour documenter les exceptions privileged)
+annotations: {}
+  # psa-exception-reason: ""
+  # psa-exception-reviewer: ""
+  # psa-exception-approved-date: ""
+
+# ResourceQuota optionnelle pour le namespace
+resourceQuota:
+  enabled: false
+  hard:
+    requests.cpu: "4"
+    requests.memory: "8Gi"
+    limits.cpu: "8"
+    limits.memory: "16Gi"
+    pods: "50"
+    persistentvolumeclaims: "10"
+
+# LimitRange optionnelle (valeurs par défaut pour les containers)
+limitRange:
+  enabled: false
+  defaultRequest:
+    cpu: "100m"
+    memory: "128Mi"
+  defaultLimit:
+    cpu: "500m"
+    memory: "512Mi"

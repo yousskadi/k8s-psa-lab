@@ -1,0 +1,39 @@
+# manifests/02-baseline/pod-non-conforme.yaml
+# Pod NON CONFORME au profil BASELINE → sera BLOQUÉ par enforce=baseline
+#
+# RÉSULTAT ATTENDU lors de kubectl apply:
+# Error from server (Forbidden): error when creating "pod-non-conforme.yaml":
+# pods "app-privilegee" is forbidden: violates PodSecurity "baseline:v1.28":
+# host namespaces (hostPID=true, hostNetwork=true)
+#
+# CE FICHIER EST INTENTIONNELLEMENT NON CONFORME - usage pédagogique
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app-privilegee
+  namespace: app-baseline
+  labels:
+    app: app-privilegee
+    psa-compliant: "false"
+    test-purpose: "demo-baseline-violation"
+spec:
+  # ❌ VIOLATION baseline : accès aux namespaces hôte
+  hostNetwork: true   # Interdit par baseline
+  hostPID: true       # Interdit par baseline
+  hostIPC: true       # Interdit par baseline
+
+  containers:
+    - name: app
+      image: nginx:1.25-alpine
+      # ❌ VIOLATION baseline : container privilegié
+      securityContext:
+        privileged: true          # Interdit par baseline
+        runAsUser: 0              # root - interdit par restricted
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "50m"
+        limits:
+          memory: "128Mi"
+          cpu: "100m"

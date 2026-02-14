@@ -1,0 +1,267 @@
+# manifests/03-restricted/deployment-payment.yaml
+# Deployment PRODUCTION-READY conforme au profil RESTRICTED
+# Simule un service de paiement avec toutes les bonnes pratiques
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api
+  namespace: payment-service
+  labels:
+    app: payment-api
+    version: "2.1"
+    tier: backend
+    compliance: pci-dss
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment-api
+  # Stratégie: zéro downtime garanti
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  template:
+    metadata:
+      labels:
+        app: payment-api
+        version: "2.1"
+      annotations:
+        # Forcer la rotation des pods lors des changements de secrets
+        kubectl.kubernetes.io/restartedAt: ""
+
+    spec:
+      # ────────────────────────────────────────────────────────
+      # SÉCURITÉ POD (niveau global)
+      # ────────────────────────────────────────────────────────
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 2000
+        # Requis par restricted
+        seccompProfile:
+          type: RuntimeDefault
+        # Bonne pratique : pas de syscalls sensibles
+        sysctls: []
+
+      # Ne pas monter le token SA sauf si nécessaire
+      automountServiceAccountToken: false
+
+      # Compte de service dédié avec RBAC minimal
+      serviceAccountName: payment-api
+
+      # Distribution sur les nœuds disponibles
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: payment-api
+
+      containers:
+        - name: payment-api
+          # En production: utiliser un registre privé avec digest
+          image: nginx:1.25-alpine  # Remplacer par votre image applicative
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+          # ────────────────────────────────────────────────────
+          # SÉCURITÉ CONTAINER (niveau container)
+          # ────────────────────────────────────────────────────
+          securityContext:
+            # Requis par restricted
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop:
+                - ALL               # Drop TOUTES les capabilities
+              # Décommenter UNIQUEMENT si besoin de ports < 1024
+              # add:
+              #   - NET_BIND_SERVICE
+            readOnlyRootFilesystem: true   # Bonne pratique
+            seccompProfile:
+              type: RuntimeDefault
+
+          # ────────────────────────────────────────────────────
+          # RESSOURCES (obligatoire en production)
+          # ────────────────────────────────────────────────────
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+          # ────────────────────────────────────────────────────
+          # HEALTH CHECKS
+          # ────────────────────────────────────────────────────
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 5
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+            timeoutSeconds: 3
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            failureThreshold: 30
+            periodSeconds: 10
+
+          # ────────────────────────────────────────────────────
+          # VOLUMES (readOnlyRootFilesystem nécessite emptyDir)
+          # ────────────────────────────────────────────────────
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: app-logs
+              mountPath: /app/logs
+            - name: app-cache
+              mountPath: /app/cache
+            # Configuration montée en lecture seule
+            - name: app-config
+              mountPath: /app/config
+              readOnly: true
+
+          # Variables d'environnement (sans secrets en clair)
+          env:
+            - name: APP_ENV
+              value: "production"
+            - name: LOG_LEVEL
+              value: "info"
+            # Secret monté comme variable d'environnement
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-db-secret
+                  key: password
+                  optional: false
+
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory    # tmpfs pour les données sensibles temporaires
+            sizeLimit: "64Mi"
+        - name: app-logs
+          emptyDir:
+            sizeLimit: "100Mi"
+        - name: app-cache
+          emptyDir:
+            sizeLimit: "256Mi"
+        - name: app-config
+          configMap:
+            name: payment-api-config
+            defaultMode: 0444    # Lecture seule
+
+      # Politique de redémarrage
+      restartPolicy: Always
+
+      # DNS personnalisé si nécessaire
+      dnsPolicy: ClusterFirst
+
+      # Tolérations pour les nœuds dédiés aux workloads critiques
+      # tolerations:
+      #   - key: "workload-type"
+      #     operator: "Equal"
+      #     value: "critical"
+      #     effect: "NoSchedule"
+---
+# Service Account dédié avec privilèges minimaux
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: payment-api
+  namespace: payment-service
+  labels:
+    app: payment-api
+automountServiceAccountToken: false
+---
+# ConfigMap de configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-api-config
+  namespace: payment-service
+data:
+  app.conf: |
+    server_port=8080
+    log_format=json
+    max_connections=100
+---
+# Secret de base de données (dans un vrai contexte: utiliser Vault ou External Secrets)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: payment-db-secret
+  namespace: payment-service
+type: Opaque
+stringData:
+  password: "change-me-in-production"  # À remplacer par Vault/SealedSecrets
+---
+# Service exposant l'API
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-api
+  namespace: payment-service
+  labels:
+    app: payment-api
+spec:
+  selector:
+    app: payment-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+---
+# HorizontalPodAutoscaler pour la production
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-api
+  namespace: payment-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payment-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

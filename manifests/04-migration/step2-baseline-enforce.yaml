@@ -1,0 +1,21 @@
+# manifests/04-migration/step2-baseline-enforce.yaml
+# ÉTAPE 2 : Activer enforce=baseline
+# Les violations baseline (hostNetwork, privileged...) sont maintenant bloquées
+# Appliquer APRÈS avoir corrigé les violations baseline identifiées à l'étape 1
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-migration
+  labels:
+    # enforce=baseline activé : les pires violations sont bloquées
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: v1.28
+    # warn+audit=restricted : on continue de voir les violations restricted
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.28
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.28
+    team: migration
+    migration-status: "phase-2-baseline-enforce"
+    migration-target: "restricted"

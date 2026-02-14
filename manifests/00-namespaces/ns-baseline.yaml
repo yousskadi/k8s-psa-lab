@@ -1,0 +1,21 @@
+# manifests/00-namespaces/ns-baseline.yaml
+# Namespace pour applications métier standards
+# Cas d'usage : applications web, APIs, microservices sans accès système
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-baseline
+  labels:
+    # enforce=baseline : bloque les configurations vraiment dangereuses
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: v1.28
+    # warn+audit=restricted : prépare la montée vers restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.28
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.28
+    # Labels organisationnels
+    team: backend
+    environment: development
+    cost-center: "team-backend"

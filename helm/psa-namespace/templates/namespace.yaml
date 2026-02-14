@@ -1,0 +1,49 @@
+{{/* helm/psa-namespace/templates/namespace.yaml */}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespaceName }}
+  labels:
+    {{- if .Values.podSecurity.enabled }}
+    pod-security.kubernetes.io/enforce: {{ .Values.podSecurity.enforce | default "baseline" | quote }}
+    pod-security.kubernetes.io/enforce-version: {{ .Values.podSecurity.version | default "latest" | quote }}
+    pod-security.kubernetes.io/audit: {{ .Values.podSecurity.audit | default "restricted" | quote }}
+    pod-security.kubernetes.io/audit-version: {{ .Values.podSecurity.version | default "latest" | quote }}
+    pod-security.kubernetes.io/warn: {{ .Values.podSecurity.warn | default "restricted" | quote }}
+    pod-security.kubernetes.io/warn-version: {{ .Values.podSecurity.version | default "latest" | quote }}
+    {{- end }}
+    {{- with .Values.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  {{- with .Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+{{- if .Values.resourceQuota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ .Values.namespaceName }}-quota
+  namespace: {{ .Values.namespaceName }}
+spec:
+  hard:
+    {{- toYaml .Values.resourceQuota.hard | nindent 4 }}
+{{- end }}
+---
+{{- if .Values.limitRange.enabled }}
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ .Values.namespaceName }}-limits
+  namespace: {{ .Values.namespaceName }}
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        {{- toYaml .Values.limitRange.defaultRequest | nindent 8 }}
+      default:
+        {{- toYaml .Values.limitRange.defaultLimit | nindent 8 }}
+{{- end }}

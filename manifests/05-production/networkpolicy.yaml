@@ -1,0 +1,73 @@
+# manifests/05-production/networkpolicy.yaml
+# NetworkPolicies complémentaires à PSA
+# PSA sécurise les pods, NetworkPolicy sécurise le réseau
+# En production, les deux sont nécessaires (defense in depth)
+---
+# Politique par défaut : deny-all pour les namespaces production
+# Chaque service doit explicitement autoriser ses communications
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: tenant-a-prod
+spec:
+  podSelector: {}    # S'applique à TOUS les pods du namespace
+  policyTypes:
+    - Ingress
+    - Egress
+  # Pas de règles = tout est bloqué par défaut
+---
+# Autoriser payment-api à recevoir du trafic interne
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-payment-api-ingress
+  namespace: payment-service
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-api
+  policyTypes:
+    - Ingress
+  ingress:
+    # Autoriser seulement depuis le namespace frontend
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: frontend
+          podSelector:
+            matchLabels:
+              app: web-frontend
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Autoriser payment-api à accéder à sa base de données uniquement
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-payment-api-egress
+  namespace: payment-service
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-api
+  policyTypes:
+    - Egress
+  egress:
+    # Autoriser DNS (kube-dns)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Autoriser accès à la base de données
+    - to:
+        - podSelector:
+            matchLabels:
+              app: payment-db
+      ports:
+        - protocol: TCP
+          port: 5432

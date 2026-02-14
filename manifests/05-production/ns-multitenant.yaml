@@ -1,0 +1,71 @@
+# manifests/05-production/ns-multitenant.yaml
+# Architecture multi-tenant production
+# Chaque namespace a une politique PSA adaptée à ses besoins
+---
+# Tenant A - Application Fintech (sécurité maximale)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-a-prod
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.28
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.28
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.28
+    tenant: tenant-a
+    environment: production
+    compliance: pci-dss
+    data-classification: confidential
+---
+# Tenant A - Staging (baseline enforce, restricted warn)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-a-staging
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: v1.28
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.28
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.28
+    tenant: tenant-a
+    environment: staging
+---
+# Tenant B - E-commerce (sécurité maximale)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-b-prod
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.28
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.28
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.28
+    tenant: tenant-b
+    environment: production
+    compliance: gdpr
+---
+# Shared Tools - Opérateurs et agents (privileged documenté)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shared-tools
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: v1.28
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.28
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.28
+    team: platform
+    environment: all
+    psa-exception: "true"
+  annotations:
+    psa-exception-reason: "Opérateurs Kubernetes nécessitant accès privileged"
+    psa-exception-reviewer: "security-team"
+    psa-exception-approved-date: "2024-01-15"

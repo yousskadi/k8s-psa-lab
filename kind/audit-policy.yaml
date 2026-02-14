@@ -1,0 +1,48 @@
+# kind/audit-policy.yaml
+# Politique d'audit Kubernetes pour capturer les violations PSA
+# Ce fichier est monté dans le control-plane Kind
+---
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+  # Capturer toutes les décisions d'admission PSA au niveau RequestResponse
+  - level: RequestResponse
+    resources:
+      - group: ""
+        resources: ["pods"]
+    namespaces:
+      - app-baseline
+      - app-restricted
+      - payment-service
+      - app-migration
+    verbs: ["create", "update"]
+
+  # Log les modifications de namespaces (changements de labels PSA)
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["namespaces"]
+    verbs: ["create", "update", "patch"]
+
+  # Ignorer les requêtes système volumineuses
+  - level: None
+    users:
+      - system:kube-proxy
+    verbs: ["watch"]
+    resources:
+      - group: ""
+        resources: ["endpoints", "services", "services/status"]
+
+  - level: None
+    users:
+      - system:unsecured
+    namespaces: ["kube-system"]
+    verbs: ["get"]
+    resources:
+      - group: ""
+        resources: ["configmaps"]
+
+  # Log tout le reste au niveau Metadata (moins verbeux)
+  - level: Metadata
+    omitStages:
+      - RequestReceived

@@ -1,0 +1,21 @@
+# manifests/04-migration/step3-restricted-enforce.yaml
+# ÉTAPE 3 : enforce=restricted - Sécurité maximale atteinte
+# Appliquer APRÈS avoir corrigé TOUTES les violations restricted
+# et validé avec: kubectl apply --dry-run=server -f <vos-manifests>
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-migration
+  labels:
+    # Toutes les politiques à restricted en enforce
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.28
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.28
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.28
+    team: migration
+    migration-status: "phase-3-complete"
+    migration-target: "restricted"
+    migration-completed: "2024-02-01"

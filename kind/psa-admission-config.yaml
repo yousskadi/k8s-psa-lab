@@ -1,0 +1,67 @@
+# kind/psa-admission-config.yaml
+# Configuration AdmissionConfiguration pour PSA
+# Définit les politiques par DÉFAUT et les EXEMPTIONS globales
+#
+# USAGE PRODUCTION: Ce fichier est passé à kube-apiserver via:
+#   --admission-control-config-file=/etc/kubernetes/psa-admission-config.yaml
+#
+# Pour Kind: voir cluster-multinode.yaml pour le montage du fichier
+---
+apiVersion: apiserver.config.k8s.io/v1
+kind: AdmissionConfiguration
+plugins:
+  - name: PodSecurity
+    configuration:
+      apiVersion: pod-security.admission.config.k8s.io/v1
+      kind: PodSecurityConfiguration
+
+      # ──────────────────────────────────────────────────────────
+      # POLITIQUES PAR DÉFAUT
+      # Appliquées à tout namespace qui n'a PAS de labels PSA explicites
+      # ──────────────────────────────────────────────────────────
+      defaults:
+        # Tout namespace sans label PSA aura baseline en enforce minimum
+        enforce: "baseline"
+        enforce-version: "latest"
+        # Et sera audité/averti pour restricted
+        audit: "restricted"
+        audit-version: "latest"
+        warn: "restricted"
+        warn-version: "latest"
+
+      # ──────────────────────────────────────────────────────────
+      # EXEMPTIONS GLOBALES
+      # Ces entités contournent TOUS les contrôles PSA
+      # À utiliser avec parcimonie et documentation obligatoire
+      # ──────────────────────────────────────────────────────────
+      exemptions:
+        # Utilisateurs exemptés (ex: comptes CI/CD, opérateurs)
+        # Note: utiliser des ServiceAccount complets si possible
+        usernames:
+          # Exemple: compte system ArgoCD
+          # - "system:serviceaccount:argocd:argocd-application-controller"
+          # Exemple: compte Flux
+          # - "system:serviceaccount:flux-system:flux"
+          []
+
+        # RuntimeClass exemptées
+        # Kata Containers gère sa propre isolation, PSA redondant
+        runtimeClasses:
+          # - kata-containers
+          []
+
+        # Namespaces système complètement exemptés
+        # ATTENTION: Ces namespaces n'ont AUCUN contrôle PSA
+        namespaces:
+          # Core Kubernetes - Ne JAMAIS retirer
+          - kube-system
+          - kube-public
+          - kube-node-lease
+          # Kind spécifique
+          - local-path-storage
+          # Exemples d'opérateurs nécessitant privileged
+          # Décommenter selon votre setup
+          # - cert-manager
+          # - ingress-nginx
+          # - monitoring
+          # - logging

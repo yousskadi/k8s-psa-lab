@@ -1,0 +1,20 @@
+# manifests/04-migration/step1-audit-only.yaml
+# ÉTAPE 1 : Mode observation (warn + audit seulement)
+# Les pods NON CONFORMES passent encore, mais vous voyez les violations
+# Appliquer avec: kubectl apply -f manifests/04-migration/step1-audit-only.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-migration
+  labels:
+    # PAS d'enforce au départ → rien n'est bloqué
+    # warn=restricted → les développeurs voient les warnings dans kubectl
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.28
+    # audit=restricted → les violations sont loguées dans les audit logs
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.28
+    team: migration
+    migration-status: "phase-1-observe"
+    migration-target: "restricted"

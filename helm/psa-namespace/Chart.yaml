@@ -1,0 +1,17 @@
+apiVersion: v2
+name: psa-namespace
+description: |
+  Crée des namespaces Kubernetes avec les labels Pod Security Admission (PSA) appropriés.
+  Permet de standardiser la création de namespaces avec les bonnes politiques de sécurité.
+type: application
+version: 1.0.0
+appVersion: "1.28"
+keywords:
+  - kubernetes
+  - security
+  - psa
+  - pod-security
+  - namespace
+maintainers:
+  - name: Platform Engineering
+    email: platform@your-org.com

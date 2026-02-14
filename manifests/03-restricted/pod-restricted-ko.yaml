@@ -1,0 +1,44 @@
+# manifests/03-restricted/pod-restricted-ko.yaml
+# Pod NON CONFORME au profil RESTRICTED → sera BLOQUÉ par enforce=restricted
+#
+# RÉSULTAT ATTENDU lors de kubectl apply:
+# Error from server (Forbidden): pods "app-non-conforme" is forbidden:
+# violates PodSecurity "restricted:v1.28":
+#   allowPrivilegeEscalation != false (container "app"),
+#   unrestricted capabilities (container "app"),
+#   seccompProfile not set (pod or container "app")
+#
+# CE FICHIER EST INTENTIONNELLEMENT NON CONFORME - usage pédagogique
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app-non-conforme
+  namespace: app-restricted
+  labels:
+    test-purpose: "demo-restricted-violation"
+spec:
+  # ✅ OK pour restricted : pas de hostNetwork/PID/IPC
+  containers:
+    - name: app
+      image: nginx:1.25-alpine
+      securityContext:
+        # ❌ VIOLATION restricted : allowPrivilegeEscalation doit être false
+        # allowPrivilegeEscalation: false  ← commenté intentionnellement
+
+        # ❌ VIOLATION restricted : capabilities.drop ALL obligatoire
+        # capabilities:
+        #   drop: [ALL]  ← commenté intentionnellement
+
+        # ❌ VIOLATION restricted : runAsNonRoot doit être true
+        runAsNonRoot: false   # ← violation explicite
+        runAsUser: 0          # root ← violation explicite
+
+      # ❌ VIOLATION restricted : seccompProfile non défini au niveau pod ou container
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "50m"
+        limits:
+          memory: "128Mi"
+          cpu: "100m"

@@ -1,0 +1,65 @@
+# kind/cluster-multinode.yaml
+# Cluster Kind multi-nœuds proche d'une architecture de production
+# 1 control-plane + 2 workers
+# Usage: kind create cluster --name psa-lab --config kind/cluster-multinode.yaml
+---
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: psa-lab
+networking:
+  # Désactiver le CNI par défaut si vous voulez tester avec Cilium/Calico
+  # disableDefaultCNI: false
+  podSubnet: "10.244.0.0/16"
+  serviceSubnet: "10.96.0.0/12"
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.28.0
+    kubeadmConfigPatches:
+      - |
+        kind: ClusterConfiguration
+        apiServer:
+          extraArgs:
+            # Active les logs d'audit pour visualiser les violations PSA
+            audit-log-path: /var/log/kubernetes/audit.log
+            audit-log-maxage: "7"
+            audit-log-maxbackup: "3"
+            audit-log-maxsize: "100"
+            audit-policy-file: /etc/kubernetes/audit-policy.yaml
+          extraVolumes:
+            - name: audit-log
+              hostPath: /var/log/kubernetes
+              mountPath: /var/log/kubernetes
+              readOnly: false
+              pathType: DirectoryOrCreate
+            - name: audit-policy
+              hostPath: /etc/kubernetes/audit-policy.yaml
+              mountPath: /etc/kubernetes/audit-policy.yaml
+              readOnly: true
+              pathType: File
+    extraMounts:
+      # Monter le fichier de politique d'audit dans le control-plane
+      - hostPath: ./kind/audit-policy.yaml
+        containerPath: /etc/kubernetes/audit-policy.yaml
+        readOnly: true
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 30080
+        protocol: TCP
+      - containerPort: 30443
+        hostPort: 30443
+        protocol: TCP
+      - containerPort: 30090
+        hostPort: 30090
+        protocol: TCP  # Prometheus NodePort (optionnel)
+
+  - role: worker
+    image: kindest/node:v1.28.0
+    labels:
+      node-role: worker
+      zone: a
+
+  - role: worker
+    image: kindest/node:v1.28.0
+    labels:
+      node-role: worker
+      zone: b
